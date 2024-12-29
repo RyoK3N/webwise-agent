@@ -1,3 +1,5 @@
+# Multi-agentic RAG with Hugging Face Code Agents
+
 This repository accompanies the blog post Multi-agentic RAG with Hugging Face Code Agents. 
 
 Code agents work by executing Python code, make sure you run the notebook in an isolated environment and don't allow any unsafe import or function. Always supervise the system execution inspecting the logs, interrupt the execution if the system is trying to execute code that may pose risks.
