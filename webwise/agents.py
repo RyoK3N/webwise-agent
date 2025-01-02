@@ -15,22 +15,24 @@ import diskcache
 from webwise.config import ContentExtractionConfig, WebSearchConfig
 from webwise.llm import LLMEngine
 from webwise.utils import format_agent_logs
+from webwise import prompts
 
 logger = logging.getLogger(__name__)
 
 class ContentExtractor:
     def __init__(self,
-                 llm_engine: LLMEngine,
+                 llm: LLMEngine,
                  embeddings: HuggingFaceEmbeddings,
-                 system_prompt: str,
-                 extraction_cfg: ContentExtractionConfig = ContentExtractionConfig(),
+                 content_cfg: ContentExtractionConfig = ContentExtractionConfig(),
                  cache_dir: Optional[str] = ".cache/content_extractor"):
+        self.llm = llm
         self.embeddings = embeddings
-        self.extraction_cfg = extraction_cfg
+        self.config = content_cfg
+        self.system_prompt = prompts.CONTENT_EXTRACTOR_PROMPT
         self.content_processor = ReactCodeAgent(
-            system_prompt=system_prompt,
-            llm_engine=llm_engine,
-            max_iterations=extraction_cfg.max_retries,
+            system_prompt=self.system_prompt,
+            llm_engine=llm,
+            max_iterations=content_cfg.max_retries,
             tools=[self.content_extraction_tool()]
         )
         self.current_content = None
@@ -54,9 +56,9 @@ class ContentExtractor:
                 return self.cache[cache_key]
 
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.extraction_cfg.chunk_size,
-            chunk_overlap=self.extraction_cfg.chunk_overlap,
-            separators=self.extraction_cfg.text_separators
+            chunk_size=self.config.chunk_size,
+            chunk_overlap=self.config.chunk_overlap,
+            separators=self.config.text_separators
         )
         
         # Process content in parallel
@@ -137,15 +139,15 @@ class ContentExtractor:
 
 class WebSourceAgent(ABC):
     def __init__(self,
-                 llm_engine: LLMEngine,
-                 content_extractor: ContentExtractor,
-                 system_prompt: str,
-                 search_cfg: WebSearchConfig = WebSearchConfig()):
-        self.search_agent = ReactCodeAgent(system_prompt=system_prompt,
-                                         llm_engine=llm_engine,
+                 llm: LLMEngine,
+                 embeddings: HuggingFaceEmbeddings,
+                 content_cfg: ContentExtractionConfig,
+                 system_prompt: Optional[str] = None):
+        self.search_agent = ReactCodeAgent(system_prompt=system_prompt or prompts.WIKI_PROMPT,
+                                         llm_engine=llm,
                                          tools=[self.search_tool(),
                                                content_extractor.content_extraction_tool()])
-        self.search_cfg = search_cfg
+        self.search_cfg = WebSearchConfig()
         self.logs = []
 
     @abstractmethod
@@ -173,6 +175,14 @@ class WebSourceAgent(ABC):
 
 
 class WikiAgent(WebSourceAgent):
+    def __init__(self, llm: LLMEngine, embeddings, content_cfg: ContentExtractionConfig, system_prompt: Optional[str] = None):
+        super().__init__(
+            llm=llm,
+            embeddings=embeddings,
+            content_cfg=content_cfg,
+            system_prompt=system_prompt or prompts.WIKI_PROMPT
+        )
+
     def search_tool(self) -> Tool:
         @tool
         def search_wiki(query: str) -> str:
@@ -194,13 +204,13 @@ class WikiAgent(WebSourceAgent):
 
 
 class CustomWebAgent(WebSourceAgent):
-    def __init__(self, 
-                 llm_engine: LLMEngine,
-                 content_extractor: ContentExtractor,
-                 system_prompt: str,
-                 base_url: str,
-                 search_cfg: WebSearchConfig = WebSearchConfig()):
-        super().__init__(llm_engine, content_extractor, system_prompt, search_cfg)
+    def __init__(self, llm: LLMEngine, embeddings, content_cfg: ContentExtractionConfig, base_url: str, system_prompt: Optional[str] = None):
+        super().__init__(
+            llm=llm,
+            embeddings=embeddings,
+            content_cfg=content_cfg,
+            system_prompt=system_prompt or prompts.CUSTOM_SITE_PROMPT.format(domain=base_url)
+        )
         self.base_url = base_url
 
     def search_tool(self) -> Tool:

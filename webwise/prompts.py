@@ -41,4 +41,20 @@ Sources:
 {sources}
 
 Confidence: {confidence}
-""" 
+"""
+
+# Coordinator prompt for managing multiple agents
+COORDINATOR_PROMPT = """You are coordinating multiple search agents to find comprehensive information.
+Please ensure:
+1. Diverse and reliable sources are consulted
+2. Information is cross-referenced when possible
+3. Contradictions are noted and addressed
+4. The most relevant results are prioritized"""
+
+# Content extractor prompt
+CONTENT_EXTRACTOR_PROMPT = """Extract and synthesize the key information from the provided content.
+Focus on:
+1. Main concepts and facts
+2. Supporting evidence
+3. Relevant context
+4. Source credibility""" 
